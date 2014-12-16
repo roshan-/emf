@@ -141,7 +141,7 @@ public class Emf2 {
 		for (String font : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
 			logger.debug("Found font={}",font);
 		}
-		extractPicturesFromDoc("in");
+		extractPicturesFromDoc("541816");
 
 	}
 

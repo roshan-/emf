@@ -4,7 +4,6 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImageOp;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
@@ -20,6 +19,8 @@ import org.imgscalr.Scalr.Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.aspose.imaging.fileformats.metafile.EmfMetafileImage;
+import com.aspose.imaging.imageoptions.PngOptions;
 import com.aspose.words.DmlEffectsRenderingMode;
 import com.aspose.words.DmlRenderingMode;
 import com.aspose.words.Document;
@@ -141,7 +142,7 @@ public class Emf2 {
 		for (String font : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
 			logger.debug("Found font={}",font);
 		}
-		extractPicturesFromDoc("541816");
+		extractPicturesFromDoc("10008965");
 
 	}
 
@@ -153,6 +154,7 @@ public class Emf2 {
 		Integer otherIndex= 1000;
 
 
+		
 		String outDir= "out" + File.separator +docName+File.separator;
 		FileUtils.forceMkdir(new File(outDir));
 		FileWriter html= new FileWriter(outDir+"out.html");          
@@ -168,15 +170,16 @@ public class Emf2 {
 					drawings.add(new WordDrawing((Shape)node));
 				}
 			}
+			int index=0;
 			logger.info("type={};count={}",type,drawings.size());
 			for (WordDrawing node : drawings) {
+				index++;
 				IImageData img= node.getImageData();
 				BufferedImage bi= img.toImage();
 				AposeWordImageType asposeWordImageType= AposeWordImageType.fromCode(img.getImageType());
 				String extn= null;
-				String trimmedDrawingName= node.getName().replace(" ", "");
+				String trimmedDrawingName= node.getName().replace(" ", "")+index;
 				ImageSize is= img.getImageSize();
-				float heightByWidth= (float)is.getHeightPixels()/is.getWidthPixels(); 
 				long resolution= 600;
 				int scale= 1000;
 				Graphics2D gd= bi.createGraphics();
@@ -209,6 +212,7 @@ public class Emf2 {
 					
 					ShapeRenderer sr= node.getShapeRenderer();
 					img.save(outDir+trimmedDrawingName+extn);
+					EmfMetafileImage emf= new EmfMetafileImage(outDir+trimmedDrawingName+extn);
 					trimmedDrawingName +=  "_" + scale + "_" + resolution + "_" + jpegQual + "_" + antiAlias + "_" + highQualityRendering;
 					ImageSaveOptions pngSave= new ImageSaveOptions(com.aspose.words.SaveFormat.PNG);
 					pngSave.setResolution(resolution);
@@ -218,8 +222,8 @@ public class Emf2 {
 					pngSave.setUseAntiAliasing(antiAlias);
 					pngSave.setScale((float)scale/1000);
 					
+					PngOptions pngOptions= new PngOptions();
 							
-					
 
 					ImageSaveOptions jpgSave= new ImageSaveOptions(SaveFormat.JPEG);
 					jpgSave.setUseHighQualityRendering(true);
@@ -230,11 +234,12 @@ public class Emf2 {
 
 					sr.save(outDir+trimmedDrawingName+".png", pngSave);
 					BufferedImage savedPNG= ImageIO.read(new File(outDir+trimmedDrawingName+".png"));
-					BufferedImage resizedFromSaved= Scalr.resize(savedPNG, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 1000,Scalr.OP_ANTIALIAS);
-					BufferedImage resizedFromBi= Scalr.resize(bi, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 1000,Scalr.OP_ANTIALIAS);
+					BufferedImage resizedFromSaved= Scalr.resize(savedPNG, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
+					BufferedImage resizedFromBi= Scalr.resize(bi, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
+					emf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
 					ImageIO.write(bi, "png", new File(outDir+trimmedDrawingName+"_buffered.png"));
-					ImageIO.write(resizedFromSaved, "png", new File(outDir+trimmedDrawingName+"_resized_from_saved_scalr_antialias.png"));
-					ImageIO.write(resizedFromBi, "png", new File(outDir+trimmedDrawingName+"_resized_from_bi_scalr_antialias.png"));
+					ImageIO.write(resizedFromSaved, "png", new File(outDir+trimmedDrawingName+"_resized_from_saved_scalr_antialias_435.png"));
+					ImageIO.write(resizedFromBi, "png", new File(outDir+trimmedDrawingName+"_resized_from_bi_scalr_antialias_435.png"));
 					//sr.save(outDir+trimmedDrawingName+".jpg", jpgSave);
 
 					html.write("\t<div>\n\t\t\n\t\t<br>\n\t\t<hr><p align=center>.SVG figure: "+ trimmedDrawingName + 

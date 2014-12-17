@@ -13,6 +13,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 import org.apache.commons.io.FileUtils;
+import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPart;
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
@@ -20,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.aspose.imaging.fileformats.metafile.EmfMetafileImage;
+import com.aspose.imaging.fileformats.metafile.WmfMetafileImage;
 import com.aspose.imaging.imageoptions.PngOptions;
 import com.aspose.words.DmlEffectsRenderingMode;
 import com.aspose.words.DmlRenderingMode;
@@ -40,7 +42,8 @@ public class Emf2 {
 
 	public enum AsposeDrawingType {
 		DRAWING_ML(NodeType.DRAWING_ML),
-		SHAPE(NodeType.SHAPE);
+		SHAPE(NodeType.SHAPE),
+		GROUP_SHAPE(NodeType.GROUP_SHAPE);
 		private final int code;
 		AsposeDrawingType (int code) {
 			this.code= code;
@@ -143,6 +146,7 @@ public class Emf2 {
 			logger.debug("Found font={}",font);
 		}
 		extractPicturesFromDoc("10008965");
+		BinaryPart bp;
 
 	}
 
@@ -192,15 +196,24 @@ public class Emf2 {
 				} catch (IllegalArgumentException e) {
 					extn= "unknown";
 				}
-				logger.debug("imageType={};name={};imageSize.Width={};imageSize.Height={};"
+				
+				String[] properties= bi.getPropertyNames();
+				logger.debug("imageType={};name={};hasImage()={};imageByteSize={};isLink={};imageSize.Width={};imageSize.Height={};"
 						+ "imageSize.HorRes={};imageSize.VertRes={};imageSize.WPoints={};imageSize.HPoints={};"
 						+ "bufferedImageType={}; biHeight={}; biWidth={}; trimmedDrawingName={}; extn={};"
 						+ ""
 						+ "bufferedImageInfo={};drawInfo={}", 
-						asposeWordImageType,node.getName(), is.getWidthPixels(),is.getHeightPixels(),
+						asposeWordImageType,node.getName(), img.hasImage(), img.getImageBytes()==null?0:img.getImageBytes().length, img.isLink(),is.getWidthPixels(),is.getHeightPixels(),
 						is.getHorizontalResolution(), is.getVerticalResolution(), is.getWidthPoints(),is.getHeightPoints(),
 						AwtImageType.fromCode(bi.getType()), bi.getHeight(), bi.getWidth(), trimmedDrawingName, extn,
 						bi.toString(), node.toString());
+				StringBuilder sb= new StringBuilder();
+				if (properties != null) {
+					for (String s : properties) {
+					sb.append(s).append(";");
+					}
+				}
+				logger.debug("\t\tproperties={}",sb.toString());
 				if (asposeWordImageType==AposeWordImageType.UNKNOWN) {
 					otherIndex++;
 					continue;
@@ -212,7 +225,15 @@ public class Emf2 {
 					
 					ShapeRenderer sr= node.getShapeRenderer();
 					img.save(outDir+trimmedDrawingName+extn);
-					EmfMetafileImage emf= new EmfMetafileImage(outDir+trimmedDrawingName+extn);
+					PngOptions pngOptions= new PngOptions();
+					if (asposeWordImageType==AposeWordImageType.EMF) {
+						EmfMetafileImage emf= new EmfMetafileImage(outDir+trimmedDrawingName+extn);
+						emf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
+					} else {
+						WmfMetafileImage wmf= new WmfMetafileImage(outDir+trimmedDrawingName+extn);
+						wmf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
+					}
+						
 					trimmedDrawingName +=  "_" + scale + "_" + resolution + "_" + jpegQual + "_" + antiAlias + "_" + highQualityRendering;
 					ImageSaveOptions pngSave= new ImageSaveOptions(com.aspose.words.SaveFormat.PNG);
 					pngSave.setResolution(resolution);
@@ -222,7 +243,6 @@ public class Emf2 {
 					pngSave.setUseAntiAliasing(antiAlias);
 					pngSave.setScale((float)scale/1000);
 					
-					PngOptions pngOptions= new PngOptions();
 							
 
 					ImageSaveOptions jpgSave= new ImageSaveOptions(SaveFormat.JPEG);
@@ -236,7 +256,6 @@ public class Emf2 {
 					BufferedImage savedPNG= ImageIO.read(new File(outDir+trimmedDrawingName+".png"));
 					BufferedImage resizedFromSaved= Scalr.resize(savedPNG, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
 					BufferedImage resizedFromBi= Scalr.resize(bi, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
-					emf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
 					ImageIO.write(bi, "png", new File(outDir+trimmedDrawingName+"_buffered.png"));
 					ImageIO.write(resizedFromSaved, "png", new File(outDir+trimmedDrawingName+"_resized_from_saved_scalr_antialias_435.png"));
 					ImageIO.write(resizedFromBi, "png", new File(outDir+trimmedDrawingName+"_resized_from_bi_scalr_antialias_435.png"));

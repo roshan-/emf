@@ -5,25 +5,27 @@ import java.awt.Graphics2D;
 import java.awt.GraphicsEnvironment;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.FilenameFilter;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.imageio.ImageIO;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.aspose.imaging.exceptions.imageformats.MetafilesException;
 import com.aspose.imaging.fileformats.metafile.EmfMetafileImage;
 import com.aspose.imaging.imageoptions.PngOptions;
 import com.aspose.words.DmlEffectsRenderingMode;
 import com.aspose.words.DmlRenderingMode;
 import com.aspose.words.Document;
+import com.aspose.words.DocumentProperty;
 import com.aspose.words.DrawingML;
 import com.aspose.words.FileFormatUtil;
 import com.aspose.words.IImageData;
@@ -31,6 +33,7 @@ import com.aspose.words.ImageSaveOptions;
 import com.aspose.words.ImageSize;
 import com.aspose.words.ImageType;
 import com.aspose.words.Node;
+import com.aspose.words.NodeCollection;
 import com.aspose.words.NodeType;
 import com.aspose.words.SaveFormat;
 import com.aspose.words.Shape;
@@ -137,15 +140,28 @@ public class Emf2 {
 		for (File fontFile : packagedFonts) {
 			Font font= Font.createFont(Font.TRUETYPE_FONT, fontFile);
 			boolean success= GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
-			logger.debug("registering font={};success={}",font.getFontName(),success);
+			logger.trace("registering font={};success={}",font.getFontName(),success);
 		}
 		for (String font : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
-			logger.debug("Found font={}",font);
+			logger.trace("Found font={}",font);
 		}
-		extractPicturesFromDoc("10008965");
+		extractPicturesFromDoc("aspose");
+		convertEmfToPng("aspose");
 
 	}
+	
+	public static void convertEmfToPng(String fileName) throws MetafilesException, FileNotFoundException {
+		ImageSaveOptions pngSave= new ImageSaveOptions(com.aspose.words.SaveFormat.PNG);
+		pngSave.setResolution(600);
+		pngSave.setUseHighQualityRendering(true);
+		pngSave.setDmlRenderingMode(DmlRenderingMode.DRAWING_ML);
+		pngSave.setDmlEffectsRenderingMode(DmlEffectsRenderingMode.FINE);
+		pngSave.setUseAntiAliasing(true);
+		EmfMetafileImage emf= new EmfMetafileImage(fileName+".emf");
+		emf.save(fileName, pngSave);
+	}
 
+	@SuppressWarnings("deprecation")
 	public static void extractPicturesFromDoc(String docName) throws Exception {
 		Document doc= new Document(docName+".docx");
 		Integer emfOrWmfIndex= 1;
@@ -162,17 +178,20 @@ public class Emf2 {
 
 		for (AsposeDrawingType type : AsposeDrawingType.values()) {
 			Node[] drawArray= doc.getChildNodes(type.code(), true).toArray();
-			List<WordDrawing> drawings= new ArrayList<WordDrawing>();
-			for (Node node : drawArray) {
-				if (node instanceof DrawingML) {
-					drawings.add(new WordDrawing((DrawingML)node));
-				} else if (node instanceof Shape) {
-					drawings.add(new WordDrawing((Shape)node));
-				}
-			}
 			int index=0;
-			logger.info("type={};count={}",type,drawings.size());
-			for (WordDrawing node : drawings) {
+			logger.info("type={};count={}",type,drawArray.length);
+			for (Node n : drawArray) {
+				WordDrawing node=null;
+				DrawingML dml= null;
+				Shape s= null;
+				if (n instanceof Shape) {
+					s= (Shape)n;
+					node= new WordDrawing(s);
+				} else if (n instanceof DrawingML) {
+					dml= (DrawingML)n;
+					node = new WordDrawing(dml);
+				}
+										
 				index++;
 				IImageData img= node.getImageData();
 				BufferedImage bi= img.toImage();
@@ -201,6 +220,24 @@ public class Emf2 {
 						is.getHorizontalResolution(), is.getVerticalResolution(), is.getWidthPoints(),is.getHeightPoints(),
 						AwtImageType.fromCode(bi.getType()), bi.getHeight(), bi.getWidth(), trimmedDrawingName, extn,
 						bi.toString(), node.toString());
+				if (StringUtils.isBlank(node.getName())) {
+					if (dml != null) {
+						dml.getParentNode();
+						logger.debug("getAncestor={}",dml.getAncestor(DocumentProperty.class));
+					} else if (s != null) {
+						s.getExpandedRunPr_IInline(54);
+						
+						logger.debug(s.toTxt()+s.getText());
+						@SuppressWarnings("unchecked")
+						NodeCollection<Node> ns= s.getChildNodes();
+						while (ns.iterator().hasNext()) {
+							Node n1= (Node)ns.iterator().next();
+							n1.getText();
+						}
+						logger.debug("shape={}",s.getAncestor(DocumentProperty.class));
+						s.getParentParagraph();
+					}
+				}
 				if (asposeWordImageType==AposeWordImageType.UNKNOWN) {
 					otherIndex++;
 					continue;

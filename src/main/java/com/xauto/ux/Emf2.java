@@ -13,6 +13,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPart;
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
@@ -23,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import com.aspose.imaging.fileformats.metafile.EmfMetafileImage;
 import com.aspose.imaging.fileformats.metafile.WmfMetafileImage;
 import com.aspose.imaging.imageoptions.PngOptions;
+import com.aspose.words.Cell;
+import com.aspose.words.CompositeNode;
 import com.aspose.words.DmlEffectsRenderingMode;
 import com.aspose.words.DmlRenderingMode;
 import com.aspose.words.Document;
@@ -33,10 +36,15 @@ import com.aspose.words.ImageSaveOptions;
 import com.aspose.words.ImageSize;
 import com.aspose.words.ImageType;
 import com.aspose.words.Node;
+import com.aspose.words.NodeCollection;
 import com.aspose.words.NodeType;
+import com.aspose.words.Paragraph;
+import com.aspose.words.Row;
+import com.aspose.words.Run;
 import com.aspose.words.SaveFormat;
 import com.aspose.words.Shape;
 import com.aspose.words.ShapeRenderer;
+import com.aspose.words.Table;
 
 public class Emf2 {
 
@@ -197,23 +205,51 @@ public class Emf2 {
 					extn= "unknown";
 				}
 				
-				String[] properties= bi.getPropertyNames();
+				String drawingName= node.getName();
+				if (StringUtils.isBlank(drawingName)) {
+					if (node.getNode() instanceof Shape) {
+						Shape s= (Shape)node.getNode();
+						Node cell= null;
+						Node parent= s.getParentNode();
+						while(parent.getNodeType()!=NodeType.ROW) {
+							if (parent.getNodeType()==NodeType.CELL) {
+								cell= parent;
+							}
+							parent= parent.getParentNode();
+						}
+						Row picturesRow= (Row)parent;
+						Row captionsRow= (Row)picturesRow.getPreviousSibling();
+						Node[] currentPicturesRowCells= picturesRow.getChildNodes(NodeType.CELL, true).toArray();
+						int foundIndex= 0;
+						for(Node n : currentPicturesRowCells) {
+							if(n==cell) {
+								break;
+							}
+							foundIndex++;
+						}
+						Cell captionCell= (Cell)captionsRow.getChild(NodeType.CELL, foundIndex, true);
+						StringBuilder sb= new StringBuilder();
+						Paragraph[] ps= captionCell.getParagraphs().toArray();
+						for (Paragraph p : ps) {
+							Run[] rs= p.getRuns().toArray();
+							for (Run r : rs) {
+								r.getDirectRunAttrsCount();
+								sb.append(r.getText());
+							}
+						}
+						drawingName= sb.toString().replace("SEQ Figure \\* ARABIC ", "");
+					}
+				}
+				
 				logger.debug("imageType={};name={};hasImage()={};imageByteSize={};isLink={};imageSize.Width={};imageSize.Height={};"
 						+ "imageSize.HorRes={};imageSize.VertRes={};imageSize.WPoints={};imageSize.HPoints={};"
 						+ "bufferedImageType={}; biHeight={}; biWidth={}; trimmedDrawingName={}; extn={};"
 						+ ""
 						+ "bufferedImageInfo={};drawInfo={}", 
-						asposeWordImageType,node.getName(), img.hasImage(), img.getImageBytes()==null?0:img.getImageBytes().length, img.isLink(),is.getWidthPixels(),is.getHeightPixels(),
+						asposeWordImageType,drawingName, img.hasImage(), img.getImageBytes()==null?0:img.getImageBytes().length, img.isLink(),is.getWidthPixels(),is.getHeightPixels(),
 						is.getHorizontalResolution(), is.getVerticalResolution(), is.getWidthPoints(),is.getHeightPoints(),
 						AwtImageType.fromCode(bi.getType()), bi.getHeight(), bi.getWidth(), trimmedDrawingName, extn,
 						bi.toString(), node.toString());
-				StringBuilder sb= new StringBuilder();
-				if (properties != null) {
-					for (String s : properties) {
-					sb.append(s).append(";");
-					}
-				}
-				logger.debug("\t\tproperties={}",sb.toString());
 				if (asposeWordImageType==AposeWordImageType.UNKNOWN) {
 					otherIndex++;
 					continue;

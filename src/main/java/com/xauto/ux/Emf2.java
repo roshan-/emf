@@ -13,6 +13,10 @@ import javax.imageio.ImageIO;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+<<<<<<< HEAD
+=======
+import org.docx4j.openpackaging.parts.WordprocessingML.BinaryPart;
+>>>>>>> a93978c2ddb936b7758b92a8f9e10323afb67dd7
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
@@ -21,7 +25,10 @@ import org.slf4j.LoggerFactory;
 
 import com.aspose.imaging.exceptions.imageformats.MetafilesException;
 import com.aspose.imaging.fileformats.metafile.EmfMetafileImage;
+import com.aspose.imaging.fileformats.metafile.WmfMetafileImage;
 import com.aspose.imaging.imageoptions.PngOptions;
+import com.aspose.words.Cell;
+import com.aspose.words.CompositeNode;
 import com.aspose.words.DmlEffectsRenderingMode;
 import com.aspose.words.DmlRenderingMode;
 import com.aspose.words.Document;
@@ -35,15 +42,20 @@ import com.aspose.words.ImageType;
 import com.aspose.words.Node;
 import com.aspose.words.NodeCollection;
 import com.aspose.words.NodeType;
+import com.aspose.words.Paragraph;
+import com.aspose.words.Row;
+import com.aspose.words.Run;
 import com.aspose.words.SaveFormat;
 import com.aspose.words.Shape;
 import com.aspose.words.ShapeRenderer;
+import com.aspose.words.Table;
 
 public class Emf2 {
 
 	public enum AsposeDrawingType {
 		DRAWING_ML(NodeType.DRAWING_ML),
-		SHAPE(NodeType.SHAPE);
+		SHAPE(NodeType.SHAPE),
+		GROUP_SHAPE(NodeType.GROUP_SHAPE);
 		private final int code;
 		AsposeDrawingType (int code) {
 			this.code= code;
@@ -145,8 +157,13 @@ public class Emf2 {
 		for (String font : java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
 			logger.trace("Found font={}",font);
 		}
+<<<<<<< HEAD
 		extractPicturesFromDoc("aspose");
 		convertEmfToPng("aspose");
+=======
+		extractPicturesFromDoc("10008965");
+		BinaryPart bp;
+>>>>>>> a93978c2ddb936b7758b92a8f9e10323afb67dd7
 
 	}
 	
@@ -211,12 +228,49 @@ public class Emf2 {
 				} catch (IllegalArgumentException e) {
 					extn= "unknown";
 				}
-				logger.debug("imageType={};name={};imageSize.Width={};imageSize.Height={};"
+				
+				String drawingName= node.getName();
+				if (StringUtils.isBlank(drawingName)) {
+					if (node.getNode() instanceof Shape) {
+						Shape s= (Shape)node.getNode();
+						Node cell= null;
+						Node parent= s.getParentNode();
+						while(parent.getNodeType()!=NodeType.ROW) {
+							if (parent.getNodeType()==NodeType.CELL) {
+								cell= parent;
+							}
+							parent= parent.getParentNode();
+						}
+						Row picturesRow= (Row)parent;
+						Row captionsRow= (Row)picturesRow.getPreviousSibling();
+						Node[] currentPicturesRowCells= picturesRow.getChildNodes(NodeType.CELL, true).toArray();
+						int foundIndex= 0;
+						for(Node n : currentPicturesRowCells) {
+							if(n==cell) {
+								break;
+							}
+							foundIndex++;
+						}
+						Cell captionCell= (Cell)captionsRow.getChild(NodeType.CELL, foundIndex, true);
+						StringBuilder sb= new StringBuilder();
+						Paragraph[] ps= captionCell.getParagraphs().toArray();
+						for (Paragraph p : ps) {
+							Run[] rs= p.getRuns().toArray();
+							for (Run r : rs) {
+								r.getDirectRunAttrsCount();
+								sb.append(r.getText());
+							}
+						}
+						drawingName= sb.toString().replace("SEQ Figure \\* ARABIC ", "");
+					}
+				}
+				
+				logger.debug("imageType={};name={};hasImage()={};imageByteSize={};isLink={};imageSize.Width={};imageSize.Height={};"
 						+ "imageSize.HorRes={};imageSize.VertRes={};imageSize.WPoints={};imageSize.HPoints={};"
 						+ "bufferedImageType={}; biHeight={}; biWidth={}; trimmedDrawingName={}; extn={};"
 						+ ""
 						+ "bufferedImageInfo={};drawInfo={}", 
-						asposeWordImageType,node.getName(), is.getWidthPixels(),is.getHeightPixels(),
+						asposeWordImageType,drawingName, img.hasImage(), img.getImageBytes()==null?0:img.getImageBytes().length, img.isLink(),is.getWidthPixels(),is.getHeightPixels(),
 						is.getHorizontalResolution(), is.getVerticalResolution(), is.getWidthPoints(),is.getHeightPoints(),
 						AwtImageType.fromCode(bi.getType()), bi.getHeight(), bi.getWidth(), trimmedDrawingName, extn,
 						bi.toString(), node.toString());
@@ -249,7 +303,15 @@ public class Emf2 {
 					
 					ShapeRenderer sr= node.getShapeRenderer();
 					img.save(outDir+trimmedDrawingName+extn);
-					EmfMetafileImage emf= new EmfMetafileImage(outDir+trimmedDrawingName+extn);
+					PngOptions pngOptions= new PngOptions();
+					if (asposeWordImageType==AposeWordImageType.EMF) {
+						EmfMetafileImage emf= new EmfMetafileImage(outDir+trimmedDrawingName+extn);
+						emf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
+					} else {
+						WmfMetafileImage wmf= new WmfMetafileImage(outDir+trimmedDrawingName+extn);
+						wmf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
+					}
+						
 					trimmedDrawingName +=  "_" + scale + "_" + resolution + "_" + jpegQual + "_" + antiAlias + "_" + highQualityRendering;
 					ImageSaveOptions pngSave= new ImageSaveOptions(com.aspose.words.SaveFormat.PNG);
 					pngSave.setResolution(resolution);
@@ -259,7 +321,6 @@ public class Emf2 {
 					pngSave.setUseAntiAliasing(antiAlias);
 					pngSave.setScale((float)scale/1000);
 					
-					PngOptions pngOptions= new PngOptions();
 							
 
 					ImageSaveOptions jpgSave= new ImageSaveOptions(SaveFormat.JPEG);
@@ -273,7 +334,6 @@ public class Emf2 {
 					BufferedImage savedPNG= ImageIO.read(new File(outDir+trimmedDrawingName+".png"));
 					BufferedImage resizedFromSaved= Scalr.resize(savedPNG, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
 					BufferedImage resizedFromBi= Scalr.resize(bi, Method.ULTRA_QUALITY, Mode.FIT_TO_WIDTH, 435);
-					emf.save(outDir+trimmedDrawingName+"_buffered_emf.png", pngOptions);
 					ImageIO.write(bi, "png", new File(outDir+trimmedDrawingName+"_buffered.png"));
 					ImageIO.write(resizedFromSaved, "png", new File(outDir+trimmedDrawingName+"_resized_from_saved_scalr_antialias_435.png"));
 					ImageIO.write(resizedFromBi, "png", new File(outDir+trimmedDrawingName+"_resized_from_bi_scalr_antialias_435.png"));
